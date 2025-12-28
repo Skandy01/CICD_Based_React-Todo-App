@@ -45,7 +45,8 @@ stages:
         - script: |
               python -m pip install --upgrade pip
               pip install flake8 pylint
-              pip install -r $(backendFolder)/requirements.txt
+              cd $(backendFolder)
+              pip install -r requirements.txt
           displayName: 'Install backend deps'
 
         - script: |
