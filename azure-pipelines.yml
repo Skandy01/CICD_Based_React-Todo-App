@@ -13,7 +13,7 @@ trigger: none
 #     include:
 #       - main
 
-pool: Azzure Pipelines
+pool: Azure Pipelines
   # vmImage: 'ubuntu-latest'
 
 variables:
