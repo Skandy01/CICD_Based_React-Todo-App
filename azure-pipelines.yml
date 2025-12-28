@@ -13,7 +13,7 @@ trigger: none
 #     include:
 #       - main
 
-pool: Azzure Pipelines
+pool: Azure Pipelines
   # vmImage: 'ubuntu-latest'
 
 variables:
@@ -43,9 +43,17 @@ stages:
           displayName: Set Python Version
 
         - script: |
+              ls -lrth
+              pwd
+              ls -lrth
               python -m pip install --upgrade pip
               pip install flake8 pylint
-              pip install -r $(backendFolder)/requirements.txt
+              echo "Next Line for Path Change"
+              cd PyTodoBackendMonolith
+              ls -lrth
+              echo "Path Changed"
+              pip install -r requirements.txt
+
           displayName: 'Install backend deps'
 
         - script: |
