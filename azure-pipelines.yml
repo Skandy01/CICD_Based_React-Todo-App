@@ -43,6 +43,8 @@ stages:
           displayName: Set Python Version
 
         - script: |
+              pwd
+              ls -lrth
               python -m pip install --upgrade pip
               pip install flake8 pylint
               cd $(backendFolder)
