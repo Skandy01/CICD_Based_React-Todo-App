@@ -43,14 +43,17 @@ stages:
           displayName: Set Python Version
 
         - script: |
-              pwd
               ls -lrth
-              cd PyTodoBackendMonolith
+              pwd
               ls -lrth
               python -m pip install --upgrade pip
               pip install flake8 pylint
-              cd $(backendFolder)
+              echo "Next Line for Path Change"
+              cd PyTodoBackendMonolith
+              ls -lrth
+              echo "Path Changed"
               pip install -r requirements.txt
+
           displayName: 'Install backend deps'
 
         - script: |
