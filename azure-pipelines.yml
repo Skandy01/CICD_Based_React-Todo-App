@@ -45,6 +45,7 @@ stages:
         - script: |
               pwd
               ls -lrth
+              cd PyTodoBackendMonolith
               python -m pip install --upgrade pip
               pip install flake8 pylint
               cd $(backendFolder)
