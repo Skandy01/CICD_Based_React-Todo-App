@@ -64,9 +64,9 @@ stages:
         targetType: 'inline'
         script: |
           pwd
-          ls -lrth
+          Get-ChildItem
           cd $(FrontendAppPath)
-          ls -lrth
+          Get-ChildItem
           npm install -g retire
           npm install
           retire --exitwith 0
@@ -100,7 +100,7 @@ stages:
           npm install -g stylelint
           npm install -g stylelint-config-standard      
           pwd  
-          ls -lrth
+          Get-ChildItem
           stylelint $(FrontendAppPath)/src/ --config stylelint.config.mjs
 
     - task: PowerShell@2
