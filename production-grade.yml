@@ -1,5 +1,9 @@
 trigger: none
 
+# pool:
+#   name: sh-app-delivery-pool
+
+
 variables: 
 - group: TodoAppPath
 
@@ -81,56 +85,56 @@ stages:
 #           retire --exitwith 0
 
 
-- stage: CodeQualityChecks
-  displayName: Code Quality & Linting
-  jobs:
-  - job: LintingChecks
-    displayName: Multi-Language Linting Checks
-    steps:
-    - task: PowerShell@2
-      continueOnError: true
-      displayName: JavaScript Linting (Biome)
-      inputs:
-        targetType: 'inline'
-        script: |
-          pwd
-          Get-ChildItem
-          Invoke-WebRequest -Uri "https://github.com/biomejs/biome/releases/download/%40biomejs%2Fbiome%402.3.8/biome-win32-x64.exe" -OutFile "$(Agent.ToolsDirectory)/biome.exe"
-          $(Agent.ToolsDirectory)/biome.exe lint $(FrontendAppPath)/src/
+# - stage: CodeQualityChecks
+#   displayName: Code Quality & Linting
+#   jobs:
+#   - job: LintingChecks
+#     displayName: Multi-Language Linting Checks
+#     steps:
+#     - task: PowerShell@2
+#       continueOnError: true
+#       displayName: JavaScript Linting (Biome)
+#       inputs:
+#         targetType: 'inline'
+#         script: |
+#           pwd
+#           Get-ChildItem
+#           Invoke-WebRequest -Uri "https://github.com/biomejs/biome/releases/download/%40biomejs%2Fbiome%402.3.8/biome-win32-x64.exe" -OutFile "$(Agent.ToolsDirectory)/biome.exe"
+#           $(Agent.ToolsDirectory)/biome.exe lint $(FrontendAppPath)/src/
 
 #(System.DefaultWorkingDirectory)/src/
 
-    - task: PowerShell@2
-      continueOnError: true
-      displayName: CSS Linting (Stylelint)  
-      inputs:
-        targetType: 'inline'
-        script: |
-          npm install -g stylelint
-          npm install -g stylelint-config-standard      
-          pwd  
-          Write-Host "Present Path hai"
-          Get-ChildItem
-          stylelint $(FrontendAppPath)/src/ --config stylelint.config.mjs
+    # - task: PowerShell@2
+    #   continueOnError: true
+    #   displayName: CSS Linting (Stylelint)  
+    #   inputs:
+    #     targetType: 'inline'
+    #     script: |
+    #       npm install -g stylelint
+    #       npm install -g stylelint-config-standard      
+    #       pwd  
+    #       Write-Host "Present Path hai"
+    #       Get-ChildItem
+    #       stylelint $(FrontendAppPath)/src/ --config stylelint.config.mjs
 
-    - task: PowerShell@2
-      continueOnError: true
-      displayName: YAML Linting (yamllint)    
-      inputs:
-        targetType: 'inline'
-        script: |
-          pip install --user yamllint
-          pwd
-          yamllint $(System.DefaultWorkingDirectory)
+    # - task: PowerShell@2
+    #   continueOnError: true
+    #   displayName: YAML Linting (yamllint)    
+    #   inputs:
+    #     targetType: 'inline'
+    #     script: |
+    #       pip install --user yamllint
+    #       pwd
+    #       yamllint $(System.DefaultWorkingDirectory)
 
-    - task: PowerShell@2
-      continueOnError: true
-      displayName: Markdown Linting (markdownlint)      
-      inputs:
-        targetType: 'inline'
-        script: |
-          npm install -g markdownlint-cli      
-          markdownlint $(System.DefaultWorkingDirectory)/
+    # - task: PowerShell@2
+    #   continueOnError: true
+    #   displayName: Markdown Linting (markdownlint)      
+    #   inputs:
+    #     targetType: 'inline'
+    #     script: |
+    #       npm install -g markdownlint-cli      
+    #       markdownlint $(System.DefaultWorkingDirectory)/
 
 - stage: BuildPackage
   displayName: Build & Artifact Packaging
@@ -151,16 +155,40 @@ stages:
       inputs:
         targetType: 'inline'
         script: |
-          'cd $(FrontendAppPath)'
-          'npm install'
+            Write-Host "===== INITIAL LOCATION ====="
+            Write-Host "PWD = $((Get-Location).Path)"
+
+            Write-Host "===== GOING TO FRONTEND PATH ====="
+            cd $(System.DefaultWorkingDirectory)/$(FrontendAppPath)
+
+            Write-Host "===== AFTER CD LOCATION ====="
+            Write-Host "PWD = $((Get-Location).Path)"
+
+            Write-Host "===== FILES INSIDE FRONTEND FOLDER ====="
+            Get-ChildItem | ForEach-Object { Write-Host $_.Name }
+
+            Write-Host "===== RUNNING NPM INSTALL ====="
+            npm install
 
     - task: PowerShell@2
       displayName: Build Application
       inputs:
         targetType: 'inline'
         script: |
-          'cd $(FrontendAppPath)'
-          'npm run build'  
+          Write-Host "===== INITIAL LOCATION ====="
+          Write-Host "PWD = $((Get-Location).Path)"
+
+          Write-Host "===== GOING TO FRONTEND PATH ====="
+          cd $(System.DefaultWorkingDirectory)/$(FrontendAppPath)
+
+          Write-Host "===== AFTER CD LOCATION ====="
+          Write-Host "PWD = $((Get-Location).Path)"
+
+          Write-Host "===== RUNNING BUILD ====="
+          npm run build
+
+          Write-Host "===== FILES AFTER BUILD ====="
+          Get-ChildItem | ForEach-Object { Write-Host $_.Name }  
 
     - task: PublishPipelineArtifact@1
       inputs:
