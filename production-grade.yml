@@ -5,51 +5,51 @@ variables:
 
 stages: 
 
-- stage: StaticCodeAnalysis
-  displayName: Static Code Analysis
+# - stage: StaticCodeAnalysis
+#   displayName: Static Code Analysis
     
-  jobs:
+#   jobs:
 
-  - job: StaticCodAnalysis
-    displayName: Static Code Analysis (SonarQube)
-    steps:
-    - task: SonarCloudPrepare@4
-      inputs:
-        SonarQube: 'SonarCloud-SC'
-        organization: 'skandy01'
-        scannerMode: 'cli'
-        configMode: 'manual'
-        cliProjectKey: 'Skandy01_React-Todo-App'
-        cliProjectName: 'React-Todo-App'
-        cliSources: '.'
+#   - job: StaticCodAnalysis
+#     displayName: Static Code Analysis (SonarQube)
+#     steps:
+#     - task: SonarCloudPrepare@4
+#       inputs:
+#         SonarQube: 'SonarCloud-SC'
+#         organization: 'skandy01'
+#         scannerMode: 'cli'
+#         configMode: 'manual'
+#         cliProjectKey: 'Skandy01_React-Todo-App'
+#         cliProjectName: 'React-Todo-App'
+#         cliSources: '.'
 
-    - task: SonarCloudAnalyze@4
-      inputs:
-        jdkversion: 'JAVA_HOME_17_X64'    
+#     - task: SonarCloudAnalyze@4
+#       inputs:
+#         jdkversion: 'JAVA_HOME_17_X64'    
 
-    - task: SonarCloudPublish@4
-      inputs:
-        pollingTimeoutSec: '300'
+#     - task: SonarCloudPublish@4
+#       inputs:
+#         pollingTimeoutSec: '300'
 
 
-    # - task: SonarQubePrepare@8
-    #   inputs:
-    #     SonarQube: 'SonarCloud-SC'
-    #     scannerMode: 'cli'
-    #     configMode: 'manual'
-    #     cliProjectKey: 'Skandy01_React-Todo-App'
-    #     cliProjectName: 'React-Todo-App'
-    #     cliSources: '.'
+#     # - task: SonarQubePrepare@8
+#     #   inputs:
+#     #     SonarQube: 'SonarCloud-SC'
+#     #     scannerMode: 'cli'
+#     #     configMode: 'manual'
+#     #     cliProjectKey: 'Skandy01_React-Todo-App'
+#     #     cliProjectName: 'React-Todo-App'
+#     #     cliSources: '.'
 
    
-    # - task: SonarQubeAnalyze@8
-    #   inputs:
-    #     jdkversion: 'JAVA_HOME_17_X64'
+#     # - task: SonarQubeAnalyze@8
+#     #   inputs:
+#     #     jdkversion: 'JAVA_HOME_17_X64'
 
 
-    # - task: SonarQubePublish@8
-    #   inputs:
-    #     pollingTimeoutSec: '300'
+#     # - task: SonarQubePublish@8
+#     #   inputs:
+#     #     pollingTimeoutSec: '300'
 
 
 - stage: SoftwareCompositionAnalysis
