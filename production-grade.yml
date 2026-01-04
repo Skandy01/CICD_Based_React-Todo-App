@@ -1,6 +1,7 @@
 trigger: none
 
 pool: 
+
   name: sh-app-delivery-pool
   demands: 
     - Agent.Name -equals sh-app-delivery-agent
@@ -37,31 +38,14 @@ stages:
 #         pollingTimeoutSec: '300'
 
 
-#     # - task: SonarQubePrepare@8
-#     #   inputs:
-#     #     SonarQube: 'SonarCloud-SC'
-#     #     scannerMode: 'cli'
-#     #     configMode: 'manual'
-#     #     cliProjectKey: 'Skandy01_React-Todo-App'
-#     #     cliProjectName: 'React-Todo-App'
-#     #     cliSources: '.'
-
-   
-#     # - task: SonarQubeAnalyze@8
-#     #   inputs:
-#     #     jdkversion: 'JAVA_HOME_17_X64'
-
-
-#     # - task: SonarQubePublish@8
-#     #   inputs:
-#     #     pollingTimeoutSec: '300'
-
 
 # - stage: SoftwareCompositionAnalysis
 
 #   jobs:
+
 #   - job:  DependencyVulnerabilityScan 
 #     displayName: Dependency Vulnerability Scan (Retire.js)
+
 #     steps: 
 #     - task: PowerShell@2
 #       displayName: Run Dependency Security Scan
@@ -86,56 +70,179 @@ stages:
 #           retire --exitwith 0
 
 
-# - stage: CodeQualityChecks
-#   displayName: Code Quality & Linting
-#   jobs:
-#   - job: LintingChecks
-#     displayName: Multi-Language Linting Checks
-#     steps:
-#     - task: PowerShell@2
-#       continueOnError: true
-#       displayName: JavaScript Linting (Biome)
-#       inputs:
-#         targetType: 'inline'
-#         script: |
-#           pwd
-#           Get-ChildItem
-#           Invoke-WebRequest -Uri "https://github.com/biomejs/biome/releases/download/%40biomejs%2Fbiome%402.3.8/biome-win32-x64.exe" -OutFile "$(Agent.ToolsDirectory)/biome.exe"
-#           $(Agent.ToolsDirectory)/biome.exe lint $(FrontendAppPath)/src/
+- stage: CodeQualityChecks
+  displayName: Code Quality & Linting
+  jobs:
 
-#(System.DefaultWorkingDirectory)/src/
+  - job: FrontendLintingChecks
+    displayName: Frontend Linting Checks
+    steps:
+    - task: PowerShell@2
+      continueOnError: true
+      displayName: JavaScript Linting (Biome)
+      inputs:
+        targetType: 'inline'
+        script: |
+          pwd
+          Get-ChildItem
+          Invoke-WebRequest -Uri "https://github.com/biomejs/biome/releases/download/%40biomejs%2Fbiome%402.3.8/biome-win32-x64.exe" -OutFile "$(Agent.ToolsDirectory)/biome.exe"
+          $(Agent.ToolsDirectory)/biome.exe lint $(FrontendAppPath)/src/
 
-    # - task: PowerShell@2
-    #   continueOnError: true
-    #   displayName: CSS Linting (Stylelint)  
-    #   inputs:
-    #     targetType: 'inline'
-    #     script: |
-    #       npm install -g stylelint
-    #       npm install -g stylelint-config-standard      
-    #       pwd  
-    #       Write-Host "Present Path hai"
-    #       Get-ChildItem
-    #       stylelint $(FrontendAppPath)/src/ --config stylelint.config.mjs
 
-    # - task: PowerShell@2
-    #   continueOnError: true
-    #   displayName: YAML Linting (yamllint)    
-    #   inputs:
-    #     targetType: 'inline'
-    #     script: |
-    #       pip install --user yamllint
-    #       pwd
-    #       yamllint $(System.DefaultWorkingDirectory)
+    - task: PowerShell@2
+      continueOnError: true
+      displayName: CSS Linting (Stylelint)  
+      inputs:
+        targetType: 'inline'
+        script: |
+          npm install -g stylelint
+          npm install -g stylelint-config-standard      
+          pwd  
+          Write-Host "Present Path hai"
+          Get-ChildItem
+          stylelint $(FrontendAppPath)/src/ --config stylelint.config.mjs
 
-    # - task: PowerShell@2
-    #   continueOnError: true
-    #   displayName: Markdown Linting (markdownlint)      
-    #   inputs:
-    #     targetType: 'inline'
-    #     script: |
-    #       npm install -g markdownlint-cli      
-    #       markdownlint $(System.DefaultWorkingDirectory)/
+    - task: NodeTool@0
+      displayName: 'Install Node.js'
+      inputs:
+          versionSpec: '18.x'
+
+    - task: PowerShell@2
+      displayName: 'ESLint'
+      continueOnError: true
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "Going to frontend directory"
+          cd $(System.DefaultWorkingDirectory)/$(FrontendAppPath)
+
+          Write-Host "Installing dependencies"
+          npm install
+
+          Write-Host "Running ESLint"
+          npx eslint src --ext .js,.jsx,.ts,.tsx
+
+   
+    - task: PowerShell@2
+      displayName: 'HTMLHint Run'
+      continueOnError: true
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "Going to frontend directory"
+          cd $(System.DefaultWorkingDirectory)/$(FrontendAppPath)
+
+          Write-Host "Installing dependencies"
+          npm install
+
+          Write-Host "Running HTMLHint"
+          npx htmlhint "src/**/*.html"  
+   
+    - task: PowerShell@2
+      continueOnError: true
+      displayName: YAML Linting (yamllint)    
+      inputs:
+        targetType: 'inline'
+        script: |
+          pip install --user yamllint
+          pwd
+          yamllint $(System.DefaultWorkingDirectory)
+
+    - task: PowerShell@2
+      continueOnError: true
+      displayName: Markdown Linting (markdownlint)      
+      inputs:
+        targetType: 'inline'
+        script: |
+          npm install -g markdownlint-cli      
+          markdownlint $(System.DefaultWorkingDirectory)/
+
+  - job: BackendLintingCode
+    displayName: Lint Backend Code
+
+    steps:
+
+    - task: PowerShell@2
+      displayName: 'MarkdownLint'
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd $(System.DefaultWorkingDirectory)/$(BackendAppPath)
+          # Install dependencies
+          npm install
+          # Install markdownlint-cli if not in package.json
+          npm install --save-dev markdownlint-cli
+          # Run markdownlint on all markdown files, excluding node_modules
+          npx markdownlint "**/*.md" --ignore node_modules  
+
+    - task: PowerShell@2
+      displayName: 'Run Textlint'
+      continueOnError: true
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "===== INITIAL LOCATION ====="
+          Write-Host "PWD = $((Get-Location).Path)"
+
+          Write-Host "===== GOING TO BACKEND PATH ====="
+          cd $(System.DefaultWorkingDirectory)/$(BackendAppPath)
+
+          Write-Host "PWD = $((Get-Location).Path)"
+          Write-Host "FILES IN BACKEND ROOT:"
+          Get-ChildItem | ForEach-Object { Write-Host $_.Name }
+
+          Write-Host "===== INSTALLING DEPENDENCIES ====="
+          npm install
+
+          Write-Host "===== RUNNING TEXTLINT ON MARKDOWN ====="
+          npx textlint "**/*.md"
+
+    - task: PyLint@0
+      displayName: Run Pylint
+      inputs:
+        pythonroot: '$(System.DefaultWorkingDirectory)/$(BackendAppPath)'
+        reqfile: '$(System.DefaultWorkingDirectory)/$(BackendAppPath)/requirements.txt'
+        modules: '.'
+
+    - task: PowerShell@2
+      displayName: 'Hadolint Dockerfile Lint'
+      continueOnError: true
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "===== HADOLINT START ====="
+
+          Write-Host "Initial path:"
+          Write-Host (Get-Location).Path
+
+          Write-Host "Going to backend directory"
+          cd $(System.DefaultWorkingDirectory)/$(BackendAppPath)
+
+          Write-Host "Current path:"
+          Write-Host (Get-Location).Path
+
+          Write-Host "Checking for Dockerfile"
+          if (!(Test-Path "Dockerfile")) {
+            Write-Host "No Dockerfile found in backend. Skipping Hadolint."
+            exit 0
+          }
+
+          Write-Host "Downloading Hadolint binary"
+          $hadolintExe = "$(Agent.ToolsDirectory)\hadolint.exe"
+          Invoke-WebRequest `
+            -Uri "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Windows-x86_64.exe" `
+            -OutFile $hadolintExe
+
+          Write-Host "Running Hadolint on Dockerfile"
+          & $hadolintExe Dockerfile
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "##vso[task.logissue type=error]Hadolint found issues in Dockerfile"
+            exit 1
+          }
+
+          Write-Host "Hadolint completed successfully"
+
 
 - stage: BuildPackage
   displayName: Build & Artifact Packaging
