@@ -14,15 +14,16 @@ stages:
     displayName: Static Code Analysis (SonarQube)
     steps:
 
-    - task: SonarQubePrepare@8
-      inputs:
-        SonarQube: 'SonarCloud-SC'
-        scannerMode: 'cli'
-        configMode: 'manual'
-        cliProjectKey: 'Skandy01_React-Todo-App'
-        cliProjectName: 'React-Todo-App'
-        cliSources: '.'
+    # - task: SonarQubePrepare@8
+    #   inputs:
+    #     SonarQube: 'SonarCloud-SC'
+    #     scannerMode: 'cli'
+    #     configMode: 'manual'
+    #     cliProjectKey: 'Skandy01_React-Todo-App'
+    #     cliProjectName: 'React-Todo-App'
+    #     cliSources: '.'
 
+    
     - task: SonarQubeAnalyze@8
       inputs:
         jdkversion: 'JAVA_HOME_17_X64'
