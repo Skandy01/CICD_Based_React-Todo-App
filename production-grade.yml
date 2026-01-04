@@ -67,7 +67,7 @@ stages:
           Write-Host "PWD = $((Get-Location).Path)"
 
           Write-Host "===== CHANGING DIRECTORY ====="
-          cd $(System.DefaultWorkingDirectory)/$(FrontendAppPath)/src/
+          cd $(System.DefaultWorkingDirectory)/$(FrontendAppPath)/
 
           Write-Host "===== AFTER CD LOCATION ====="
           Write-Host "PWD = $((Get-Location).Path)"
@@ -81,58 +81,87 @@ stages:
           retire --exitwith 0
 
 
-# - stage: CodeQualityChecks
-#   displayName: Code Quality & Linting
+- stage: CodeQualityChecks
+  displayName: Code Quality & Linting
   
-#   jobs:
+  jobs:
   
-#   - job: LintingChecks
-#     displayName: Multi-Language Linting Checks
-#     steps:
-#     - task: PowerShell@2
-#       continueOnError: true
-#       displayName: JavaScript Linting (Biome)
-#       inputs:
-#         targetType: 'inline'
-#         script: |
-#           pwd
-#           Get-ChildItem
-#           Invoke-WebRequest -Uri "https://github.com/biomejs/biome/releases/download/%40biomejs%2Fbiome%402.3.8/biome-win32-x64.exe" -OutFile "$(Agent.ToolsDirectory)/biome.exe"
-#           $(Agent.ToolsDirectory)/biome.exe lint $(FrontendAppPath)/src/
+  - job: LintingChecks
+    displayName: Multi-Language Linting Checks
+    steps:
+    - task: PowerShell@2
+      continueOnError: true
+      displayName: JavaScript Linting (Biome)
+      inputs:
+        targetType: 'inline'
+        script: |
 
-#           #(System.DefaultWorkingDirectory)/src/
+          Write-Host "===== INITIAL LOCATION ====="
+          Write-Host "PWD = $((Get-Location).Path)"
 
-#     - task: PowerShell@2
-#       continueOnError: true
-#       displayName: CSS Linting (Stylelint)  
-#       inputs:
-#         targetType: 'inline'
-#         script: |
-#           npm install -g stylelint
-#           npm install -g stylelint-config-standard      
-#           pwd  
-#           Write-Host "Present Path hai"
-#           Get-ChildItem
-#           stylelint $(FrontendAppPath)/src/ --config stylelint.config.mjs
+          Write-Host "===== FRONTEND ROOT PE JA RAHE HAIN ====="
+          cd $(System.DefaultWorkingDirectory)/$(FrontendAppPath)
 
-#     - task: PowerShell@2
-#       continueOnError: true
-#       displayName: YAML Linting (yamllint)    
-#       inputs:
-#         targetType: 'inline'
-#         script: |
-#           pip install --user yamllint
-#           pwd
-#           yamllint $(System.DefaultWorkingDirectory)
+          Write-Host "===== AFTER CD LOCATION ====="
+          Write-Host "PWD = $((Get-Location).Path)"
 
-#     - task: PowerShell@2
-#       continueOnError: true
-#       displayName: Markdown Linting (markdownlint)      
-#       inputs:
-#         targetType: 'inline'
-#         script: |
-#           npm install -g markdownlint-cli      
-#           markdownlint $(System.DefaultWorkingDirectory)/
+          Write-Host "===== FILES IN FRONTEND ROOT ====="
+          Get-ChildItem | ForEach-Object { Write-Host $_.Name }
+
+          Write-Host "===== DOWNLOADING BIOME ====="
+          Invoke-WebRequest `
+            -Uri "https://github.com/biomejs/biome/releases/download/%40biomejs%2Fbiome%402.3.8/biome-win32-x64.exe" `
+            -OutFile "$(Agent.ToolsDirectory)/biome.exe"
+
+          Write-Host "===== RUNNING BIOME ON SRC ====="
+          $(Agent.ToolsDirectory)/biome.exe lint "$(System.DefaultWorkingDirectory)/$(FrontendAppPath)/src"
+        
+
+           
+    - task: PowerShell@2
+      continueOnError: true
+      displayName: CSS Linting (Stylelint)
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "===== INITIAL LOCATION ====="
+          Write-Host "PWD = $((Get-Location).Path)"
+
+          Write-Host "===== GOING TO FRONTEND ROOT ====="
+          cd $(System.DefaultWorkingDirectory)/$(FrontendAppPath)
+
+          Write-Host "===== AFTER CD LOCATION ====="
+          Write-Host "PWD = $((Get-Location).Path)"
+
+          Write-Host "===== FILES IN FRONTEND ROOT ====="
+          Get-ChildItem | ForEach-Object { Write-Host $_.Name }
+
+          Write-Host "===== INSTALLING STYLELINT ====="
+          npm install -g stylelint
+          npm install -g stylelint-config-standard
+
+          Write-Host "===== RUNNING STYLELINT ON SRC ====="
+          stylelint "$(System.DefaultWorkingDirectory)/$(FrontendAppPath)/src" --config stylelint.config.mjs
+
+
+    - task: PowerShell@2
+      continueOnError: true
+      displayName: YAML Linting (yamllint)    
+      inputs:
+        targetType: 'inline'
+        script: |
+          pip install --user yamllint
+          pwd
+          yamllint $(System.DefaultWorkingDirectory)
+
+    - task: PowerShell@2
+      continueOnError: true
+      displayName: Markdown Linting (markdownlint)      
+      inputs:
+        targetType: 'inline'
+        script: |
+          npm install -g markdownlint-cli      
+          markdownlint $(System.DefaultWorkingDirectory)/
 
 # - stage: BuildPackage
 #   displayName: Build & Artifact Packaging
