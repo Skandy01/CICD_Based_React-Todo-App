@@ -63,12 +63,23 @@ stages:
       inputs:
         targetType: 'inline'
         script: |
-          pwd
+          Write-Host "===== INITIAL LOCATION ====="
+          Write-Host "PWD:"
+          Get-Location
+          Write-Host "FILES:"
           Get-ChildItem
-          Write-Host "Change path start ho raha hai"
-          cd $(FrontendAppPath)
-          Write-Host "Change hogya hai path"
+
+          Write-Host "===== CHANGING DIRECTORY ====="
+          Write-Host "cd to frontend path: $(FrontendAppPath)"
+          cd $(System.DefaultWorkingDirectory)/$(FrontendAppPath)
+
+          Write-Host "===== AFTER CD LOCATION ====="
+          Write-Host "PWD:"
+          Get-Location
+          Write-Host "FILES:"
           Get-ChildItem
+
+          Write-Host "===== RUNNING RETIRE ====="
           npm install -g retire
           npm install
           retire --exitwith 0
