@@ -65,7 +65,9 @@ stages:
         script: |
           pwd
           Get-ChildItem
+          Write-Host "Change path start ho raha hai"
           cd $(FrontendAppPath)
+          Write-Host "Change hogya hai path"
           Get-ChildItem
           npm install -g retire
           npm install
@@ -100,6 +102,7 @@ stages:
           npm install -g stylelint
           npm install -g stylelint-config-standard      
           pwd  
+          Write-Host "Present Path hai"
           Get-ChildItem
           stylelint $(FrontendAppPath)/src/ --config stylelint.config.mjs
 
