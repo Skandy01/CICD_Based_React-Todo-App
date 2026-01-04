@@ -64,20 +64,16 @@ stages:
         targetType: 'inline'
         script: |
           Write-Host "===== INITIAL LOCATION ====="
-          Write-Host "PWD:"
-          Get-Location
-          Write-Host "FILES:"
-          Get-ChildItem
+          Write-Host "PWD = $((Get-Location).Path)"
 
           Write-Host "===== CHANGING DIRECTORY ====="
-          Write-Host "cd to frontend path: $(FrontendAppPath)"
           cd $(System.DefaultWorkingDirectory)/$(FrontendAppPath)
 
           Write-Host "===== AFTER CD LOCATION ====="
-          Write-Host "PWD:"
-          Get-Location
-          Write-Host "FILES:"
-          Get-ChildItem
+          Write-Host "PWD = $((Get-Location).Path)"
+
+          Write-Host "===== FILES IN CURRENT DIR ====="
+          Get-ChildItem | Select-Object Name
 
           Write-Host "===== RUNNING RETIRE ====="
           npm install -g retire
