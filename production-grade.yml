@@ -1,8 +1,9 @@
 trigger: none
 
-# pool:
-#   name: sh-app-delivery-pool
-
+pool: 
+  name: sh-app-delivery-pool
+  demands: 
+    - Agent.Name -equals sh-app-delivery-agent
 
 variables: 
 - group: TodoAppPath
