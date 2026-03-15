@@ -1,0 +1,12 @@
+name: First GHA HandsOn
+on: [push]
+
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Frontend
+        run: echo "Build React Frontend"
+
+      - name: Check Date
+        run: date

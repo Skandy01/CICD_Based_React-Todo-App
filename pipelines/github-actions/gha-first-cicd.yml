@@ -1,0 +1,19 @@
+name: First GHA HandsOn
+on: [push]
+
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Frontend
+        run: echo "Build React Frontend"
+
+      - name: Check Date
+        run: date
+
+      - name: Call Secret
+        run: echo "${{ secrets.KV_KEY }}"
+
+      - name: Using Condition
+        if: github.event_name != 'push'
+        run: echo "Condition Met"

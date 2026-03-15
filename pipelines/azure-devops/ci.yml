@@ -1,0 +1,115 @@
+trigger: none
+
+variables:
+  backendPath: 'PyTodoBackendMonolith'
+  frontendPath: 'React_Todo_App_UI'
+
+stages:
+  - stage: Lint
+    displayName: Lint
+    jobs:
+      - job: LintFrontend
+        displayName: 'Lint Frontend'
+        steps:
+        - task: NodeTool@0
+          inputs:
+            versionSource: 'spec'
+            versionSpec: '18.x'
+          displayName: 'Install NodeJS'
+        - task: PowerShell@2
+          inputs:
+            targetType: 'inline'
+            script: |
+              cd $(frontendPath)
+              npm install
+              # Install lint tools if not in package.json (run locally once and commit)
+              npm install --save-dev eslint @eslint/js globals eslint-plugin-react eslint-config-standard stylelint stylelint-config-standard @biomejs/biome
+          displayName: 'Install frontend dependencies + lint tools'
+        - task: PowerShell@2
+          inputs:
+            targetType: 'inline'
+            script: |
+              cd $(frontendPath)
+              npx eslint src/ --ext .js,.jsx,.ts,.tsx
+              npx stylelint "**/*.css"
+              npx biome lint ./src
+          displayName: 'Lint with eslint + stylelint + biome'
+          continueOnError: true
+
+      - job: LintBackend
+        displayName: 'Lint Python Backend'
+        steps:
+        - task: UsePythonVersion@0
+          inputs:
+            versionSpec: '3.12'
+            addToPath: true
+            architecture: 'x64'
+          displayName: 'Set Python Version'
+
+        - task: PowerShell@2
+          inputs:
+            targetType: 'inline'
+            script: |
+              python -m pip install --upgrade pip
+              pip install flake8 pylint
+              pip install -r $(backendPath)/requirements.txt
+          displayName: 'Install backend dependencies'
+
+        - task: PowerShell@2
+          inputs:
+            targetType: 'inline'
+            script: |
+              flake8 $(backendPath) --count --select=E9,F63,F7,F82 --show-source --statistics
+              pylint $(backendPath) --recursive=y
+          displayName: 'Lint with flake8 + pylint'
+          continueOnError: true
+
+  - stage: Scan
+    displayName: 'Security Scan'
+    dependsOn: Lint
+    jobs:
+      - job: ScanFrontend
+        displayName: 'Scan JS Dependencies with Retire.js'
+        steps:
+        - task: NodeTool@0
+          inputs:
+            versionSource: 'spec'
+            versionSpec: '18.x'
+          displayName: 'Install NodeJS'
+        
+        - task: PowerShell@2
+          inputs:
+            targetType: 'inline'
+            script: |
+              cd $(frontendPath)
+               npm install  # Ye package-lock.json banayega for accurate version scan
+          displayName: 'Install frontend dependencies for scan'
+
+        - task: PowerShell@2
+          inputs:
+            targetType: 'inline'
+            script: |
+              cd $(frontendPath)
+                            npm install
+                            npm install --save-dev retire
+                            npx retire --outputformat json --outputpath retire-report.json --severity high
+          displayName: 'Retire.js Scan'
+
+        # - task: Retire@1
+        #   inputs:
+        #     path: '$(frontendPath)'
+        #     verbose: true
+        #     failOnVulnerabilities: true
+        #   displayName: 'Retire.js Scan'
+
+      - job: ScanBackend
+        displayName: 'Scan Python Dependencies'
+        steps:
+        - task: PowerShell@2
+          inputs:
+            targetType: 'inline'
+            script: |
+              pip install pip-audit
+              cd $(backendPath)
+              pip-audit -r requirements.txt --ignore-vuln PYSEC-2023-1   # Add --ignore if needed
+          displayName: 'Dependency scan with pip-audit'

@@ -1,0 +1,37 @@
+name: Python Automation Workflow
+
+on:
+  push:
+    branches: [ "main"   ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  run-python-logic:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+            python-version: '3.9'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install azure-identity
+          pip install azure-mgmt-resource
+
+      - name: 'Az CLI Login'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_SP_CREDENTIALS }}
+
+      - name: Run Script with Azure Context
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secretS.AZURE_TENANT_ID }}
+        run: python script.py

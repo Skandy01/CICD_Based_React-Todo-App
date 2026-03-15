@@ -1,0 +1,699 @@
+trigger: none
+
+variables:
+- group: toDo-App
+
+parameters:
+
+  - name: runSoftwareCompositionAnalysis
+    displayName: 'Run Software Composition Analysis?'
+    type: boolean
+    default: false
+
+  - name: runStaticCodeAnalysis
+    displayName: 'Run Static Code Analysis?'
+    type: boolean
+    default: false
+
+  - name: runBuild
+    displayName: 'Run Build Stage?'
+    type: boolean
+    default: false
+
+  - name: runDeploymentApproval
+    displayName: 'Require Deployment Approval?'
+    type: boolean
+    default: false
+
+  - name: runDeployToDev
+    displayName: 'Deploy To Dev?'
+    type: boolean
+    default: false
+
+pool:
+  name: sh-app-delivery-pool
+
+stages:
+    - stage: SoftwareCompositionAnalysis
+      displayName: Software Composition Analysis
+
+      jobs:
+      - job: DependencyVulnerabilityScan
+        displayName: Dependency Vulnerability Scan (Retire.js)
+
+        steps:
+        - task: PowerShell@2
+          displayName: 'Retire.js Install and Run'
+          inputs:
+            targetType: 'inline'
+            script: |
+                Write-Host "===== INITIAL LOCATION ====="
+                Write-Host "PWD = $((Get-Location).Path)"
+      
+                Write-Host "===== CHANGING DIRECTORY ====="
+                cd $(System.DefaultWorkingDirectory)/$(frontendPath)
+      
+                Write-Host "===== AFTER CD LOCATION ====="
+                Write-Host "PWD = $((Get-Location).Path)"
+      
+                Write-Host "===== FILES IN CURRENT DIR ====="
+                Get-ChildItem | Select-Object Name
+      
+                Write-Host "===== INSTALL DEPENDENCIES ====="
+                npm install
+
+                Write-Host "===== RUNNING RETIRE.JS ====="
+                npx retire --path . --outputformat json --outputpath retire-report.json --exitwith 0
+        - task: PublishPipelineArtifact@1
+          displayName: Publish Retire.js Report
+          inputs:
+            targetPath: '$(System.DefaultWorkingDirectory)/$(frontendPath)/retire-report.json'
+            artifact: 'retirejs-report'
+            publishLocation: 'pipeline'
+
+    - stage: StaticCodeAnalysis
+      displayName: Static Code Analysis (SonarQube)
+
+      jobs:
+      - job: SonarQubeScan
+        displayName: SonarQube Scan
+
+        steps:
+        - task: SonarQubePrepare@8
+          inputs:
+            SonarQube: 'SonarCloud'
+            scannerMode: 'cli'
+            configMode: 'manual'
+            cliProjectKey: 'BhabyaBharti_ToDo-App'
+            cliProjectName: 'ToDo-App'
+            cliSources: '.'
+            extraProperties: |
+              sonar.organization=bhabyabharti
+              sonar.host.url=https://sonarcloud.io
+              sonar.tests=
+              sonar.test.exclusions=**/*
+
+        - task: SonarQubeAnalyze@8
+          continueOnError: true
+          inputs:
+            jdkversion: 'JAVA_HOME_17_X64'
+
+        - task: SonarQubePublish@8
+          inputs:
+            pollingTimeoutSec: '300'
+
+    - stage: CodeQualityChecks
+      displayName: Code Quality & Linting
+
+      jobs:
+      - job: LintFrontend
+        displayName: 'Lint React Frontend'
+
+        steps:
+        - task: NodeTool@0
+          inputs:
+            versionSource: 'spec'
+            versionSpec: '18.x'
+          displayName: 'Install NodeJS'
+
+        - task: PowerShell@2
+          displayName: Install and Run HTMLHint
+          inputs:
+            targetType: 'inline'
+            script: |
+              cd $(frontendPath)\src
+              npm install       
+                # Install HTMLHint if not in package.json (run locally once and commit)       
+              npm install --save-dev htmlhint
+              npx htmlhint "**/*.html"
+        
+        - task: PowerShell@2
+          displayName: Install and Run Biome
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              pwd
+              Get-ChildItem
+              Invoke-WebRequest -Uri "https://github.com/biomejs/biome/releases/download/%40biomejs%2Fbiome%402.3.8/biome-win32-x64.exe" -OutFile "$(Agent.ToolsDirectory)/biome.exe"
+              $(Agent.ToolsDirectory)/biome.exe lint $(frontendpath)/src/
+
+        - task: PowerShell@2
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              Write-Host "Initializing npm project..."
+              npm init -y
+
+              Write-Host "Installing Stylelint..."
+              npm install --save-dev stylelint stylelint-config-standard stylelint-config-recommended
+              pwd
+              Write-Host "Creating .stylelintrc.json..."
+
+              $config = @{
+                extends = @(
+                  "stylelint-config-standard"
+                  "stylelint-config-recommended"
+                )
+              }
+
+              $config | ConvertTo-Json -Depth 5 | Out-File ".stylelintrc.json" -Encoding utf8
+              # Write-Host "Present Path hai"
+              Get-ChildItem
+
+              Write-Host "Running Stylelint..."
+              npx stylelint "**/*.css" "**/*.scss"
+
+              exit 0
+
+          displayName: Install and Run StyleLint
+
+        - task: PowerShell@2
+          continueOnError: true
+          displayName: YAML Linting (yamllint)    
+          inputs:
+            targetType: 'inline'
+            script: |
+              pip install --user yamllint
+              pwd
+              yamllint $(System.DefaultWorkingDirectory)
+
+
+        - task: PowerShell@2
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+                cd $(frontendPath)
+                # Current Path
+                pwd
+                npm install
+                # Install lint tools if not in package.json (run locally once and commit)
+                npm install --save-dev eslint @eslint/js globals eslint-plugin-react eslint-config-standard 
+                npx eslint src/ --ext .js,.jsx,.ts,.tsx
+                npx stylelint "**/*.css"
+                npx biome lint ./src
+
+          displayName: 'Install and Run ESLint'
+
+        - task: PowerShell@2
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              npm install -g markdownlint-cli
+               # Current dir
+              pwd
+              markdownlint $(System.DefaultWorkingDirectory)/
+
+          displayName: 'MarkdownLint Run'
+          
+      - job: LintBackend
+        displayName: Lint Python Backend
+
+        steps:
+        - task: PowerShell@2
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              cd $(backendPath)/
+               # current dir
+               pwd
+      
+              # Install dependencies
+              npm install
+              
+              # Install markdownlint-cli if not in package.json
+              npm install --save-dev markdownlint-cli
+              
+              # Run markdownlint on all markdown files, excluding node_modules
+              npx markdownlint "**/*.md" --ignore node_modules
+
+          displayName: 'Markdownlint Install & Run'
+
+        - task: PowerShell@2
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              cd $(backendPath)
+               # current dir
+               pwd
+              # Install dependencies
+              npm install
+              
+              # Install textlint and common presets if not in package.json
+              npm install --save-dev textlint textlint-rule-preset-ja-technical-writing
+              
+              # Run textlint on markdown files
+              npx textlint "**/*.md"
+
+          displayName: 'TextLint Install & Run'
+
+        - task: PyLint@0
+          continueOnError: true
+          displayName: Run PyLint
+          inputs:
+            pythonroot: '$(backendPath)'
+            reqfile: '$(backendPath)/requirements.txt'
+            modules: '.'
+
+        - task: PowerShell@2
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              # Install Hadolint (Windows)
+              Write-Host "Installing Hadolint for Dockerfile linting..."
+              
+              # Method 1: Using Chocolatey (if available)
+              if (Get-Command choco -ErrorAction SilentlyContinue) {
+                Write-Host "Installing via Chocolatey..."
+                choco install hadolint -y
+              } else {
+                # Method 2: Download executable directly
+                Write-Host "Downloading Hadolint executable..."
+                $hadolintUrl = "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Windows-x86_64.exe"
+                $hadolintPath = "$env:TEMP\hadolint.exe"
+                
+                Invoke-WebRequest -Uri $hadolintUrl -OutFile $hadolintPath
+                
+                # Make it available globally
+                Copy-Item $hadolintPath "$env:ProgramFiles\hadolint\hadolint.exe"
+                [Environment]::SetEnvironmentVariable("Path", "$env:Path;$env:ProgramFiles\hadolint", "Machine")
+              }
+            
+              # Run Hadolint on Dockerfiles
+              Write-Host "Running Hadolint on Dockerfiles..."
+              
+              # Find all Dockerfiles recursively
+              $dockerfiles = Get-ChildItem -Recurse -Filter "Dockerfile*" -File
+              # current dir
+               pwd
+              
+              if ($dockerfiles.Count -eq 0) {
+                Write-Host "No Dockerfiles found. Skipping Hadolint."
+                exit 0
+              }
+            
+              Write-Host "Found $($dockerfiles.Count) Dockerfile(s):"
+              $dockerfiles | ForEach-Object { Write-Host "  - $($_.FullName)" }
+              
+              # Run Hadolint on each Dockerfile
+              $errorsFound = $false
+              foreach ($dockerfile in $dockerfiles) {
+                Write-Host "`nLinting: $($dockerfile.FullName)"
+                
+                # Run Hadolint
+                if (Get-Command hadolint -ErrorAction SilentlyContinue) {
+                  hadolint $dockerfile.FullName
+                } elseif (Test-Path $hadolintPath) {
+                  & $hadolintPath $dockerfile.FullName
+                } else {
+                  Write-Host "Hadolint not found. Please install manually."
+                  exit 1
+                }
+                
+                # Check exit code
+                if ($LASTEXITCODE -ne 0) {
+                  $errorsFound = $true
+                }
+              }
+            
+              if ($errorsFound) {
+                Write-Host "vso[task.logissue type=error]Hadolint found issues in Dockerfile(s)"
+                Write-Host "vso[task.complete result=Failed]"
+                exit 1
+              }
+              
+              Write-Host "✅ Hadolint completed successfully!"
+              
+          displayName: 'Install and Run Hadolint'
+
+    - stage: BuildAndPackage
+      displayName: Build & Artifact Packaging
+      
+      dependsOn: StaticCodeAnalysis
+      
+      jobs:
+      - job: FrontendApplicationBuild
+        displayName: Frontend Application Build
+        
+        steps:
+        - task: NodeTool@0
+          displayName: Set Up Node.js Environment
+          inputs:
+            versionSource: 'spec'
+            versionSpec: '16.x'
+
+        - task: PowerShell@2
+          displayName: Change to Frontend Directory
+          inputs:
+            targetType: 'inline'
+            script: |
+              Write-Host "=== DEBUG: Checking directory structure ==="
+              Write-Host "Current directory: $(Get-Location)"
+              Write-Host ""
+              Write-Host "=== All files and folders ==="
+              Get-ChildItem
+              Write-Host ""
+              Write-Host "=== Checking for React_Todo_App_UI ==="
+              if (Test-Path "React_Todo_App_UI") {
+                Write-Host "✓ Found React_Todo_App_UI"
+                Write-Host "=== Contents of React_Todo_App_UI ==="
+                Get-ChildItem "React_Todo_App_UI"
+                Write-Host ""
+                Write-Host "=== Checking for package.json ==="
+                if (Test-Path "React_Todo_App_UI/package.json") {
+                  Write-Host "✓ Found package.json"
+                } else {
+                    Write-Host "✗ package.json NOT FOUND in React_Todo_App_UI"
+                  }
+                } else {
+                  Write-Host "✗ React_Todo_App_UI NOT FOUND"
+                }
+        - task: PowerShell@2
+          displayName: Install Dependencies
+          inputs:
+              targetType: inline
+              script: |
+                Write-Host "=== Installing dependencies ==="
+                Write-Host "Current directory before cd: $(Get-Location)"
+                
+                if (Test-Path "React_Todo_App_UI") {
+                  cd "React_Todo_App_UI"
+                  Write-Host "Changed to: $(Get-Location)"
+                  Write-Host "Running npm install..."
+                  npm install
+                  if ($LASTEXITCODE -ne 0) {
+                    Write-Host "##vso[task.logissue type=error]npm install failed"
+                    exit 1
+                  }
+                } else {
+                  Write-Host "##vso[task.logissue type=error]React_Todo_App_UI directory not found"
+                  Write-Host "Available directories:"
+                  Get-ChildItem
+                  exit 1
+                }
+
+        - task: PowerShell@2
+          displayName: Build Application
+          inputs:
+              targetType: inline
+              script: |
+                Write-Host "=== Building application ==="
+                Write-Host "Current directory before cd: $(Get-Location)"
+                
+                if (Test-Path "React_Todo_App_UI") {
+                  cd "React_Todo_App_UI"
+                  Write-Host "Changed to: $(Get-Location)"
+                  Write-Host "Running npm run build..."
+                  npm run build
+                  if ($LASTEXITCODE -ne 0) {
+                    Write-Host "##vso[task.logissue type=error]npm run build failed"
+                    exit 1
+                  }
+                  
+                  # Check if build folder was created
+                  if (Test-Path "build") {
+                    Write-Host "✓ Build folder created successfully"
+                    Write-Host "=== Contents of build folder ==="
+                    Get-ChildItem "build"
+                  } else {
+                    Write-Host "✗ Build folder not created"
+                      Write-Host "Current directory contents:"
+                      Get-ChildItem
+                    }
+                  } else {
+                    Write-Host "##vso[task.logissue type=error]React_Todo_App_UI directory not found"
+                    exit 1
+                  }
+
+        - task: PublishPipelineArtifact@1
+          displayName: Publish Build Artifacts
+          inputs:
+            targetPath: '$(System.DefaultWorkingDirectory)/React_Todo_App_UI/build/'
+            artifact: 'todo-ui'
+            publishLocation: 'pipeline'
+
+      - job: BackendApplicationBuild
+        displayName: Backend Application Build
+        steps:
+        
+        - task: PowerShell@2
+          displayName: 'Agent me Python Setup Karo'
+          inputs:
+            targetType: 'inline'
+            script: |
+              Write-Host "=== Agent ke liye Alag Python Install ==="
+              
+              # Agent ke workspace me Python rakho
+              $agentPythonPath = "$(Agent.ToolsDirectory)\python-3.10"
+              $pythonExe = "$agentPythonPath\python.exe"
+              
+              Write-Host "Python rakha jayega: $agentPythonPath"
+              
+              # Agar pehle se nahi hai to download karo
+              if (-not (Test-Path $pythonExe)) {
+                Write-Host "Downloading Python for agent..."
+                
+                # Python ka zip download karo
+                $pythonZip = "https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip"
+                $zipPath = "$env:TEMP\python-agent.zip"
+                
+                Invoke-WebRequest -Uri $pythonZip -OutFile $zipPath -UseBasicParsing
+                
+                # Extract karo
+                New-Item -ItemType Directory -Path $agentPythonPath -Force | Out-Null
+                Expand-Archive -Path $zipPath -DestinationPath $agentPythonPath -Force
+                
+                # Pip ke liye setup
+                $getPipUrl = "https://bootstrap.pypa.io/get-pip.py"
+                $getPipPath = "$agentPythonPath\get-pip.py"
+                Invoke-WebRequest -Uri $getPipUrl -OutFile $getPipPath -UseBasicParsing
+                
+                # Python310._pth file modify karo
+                $pthFile = "$agentPythonPath\python310._pth"
+                (Get-Content $pthFile) -replace "^#import site$", "import site" | Set-Content $pthFile
+                
+                # Pip install karo
+                & $pythonExe $getPipPath
+                
+                # Cleanup
+                Remove-Item $zipPath -Force
+                Remove-Item $getPipPath -Force
+                
+                Write-Host "✓ Agent Python setup complete!"
+              } else {
+                Write-Host "✓ Agent Python already exists"
+              }
+              
+              # Verify
+              & $pythonExe --version
+              
+        - task: PowerShell@2
+          displayName: 'Dependencies Install Karo'
+          inputs:
+            targetType: 'inline'
+            script: |
+              # Agent Python use karo
+              $agentPythonPath = "$(Agent.ToolsDirectory)\python-3.10"
+              $pythonExe = "$agentPythonPath\python.exe"
+              $pipExe = "$agentPythonPath\Scripts\pip.exe"
+              
+              Write-Host "Using Agent Python from: $agentPythonPath"
+              
+              # Project folder me jao
+              cd "PyTodoBackendMonolith"
+              
+              # Dependencies install karo
+              if (Test-Path $pipExe) {
+                & $pipExe install -r requirements.txt
+              } else {
+                # Fallback
+                & $pythonExe -m pip install -r requirements.txt
+              }
+              
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "✓ Sab dependencies install ho gaye!"
+              } else {
+                Write-Host "##vso[task.logissue type=error]Installation failed"
+                exit 1
+              }
+              
+        - task: PublishPipelineArtifact@1
+          displayName: 'Backend Publish Karo'
+          inputs:
+            targetPath: '$(System.DefaultWorkingDirectory)/PyTodoBackendMonolith/'
+            artifact: 'todo-backend'
+            publishLocation: 'pipeline'
+
+    - stage: ApprovalGate
+      displayName: Appoval Gate
+
+      dependsOn: BuildAndPackage
+
+      pool: server
+
+      jobs:
+        - job: ManualValidation
+          displayName: ManualValidation
+          steps:
+          - task: ManualValidation@1
+            inputs:
+              notifyUsers: 'devopscollab101@gmail.com'
+              onTimeout: 'resume'
+
+    - stage: DeployToDev
+      displayName: Deploy to Dev environment
+      #condition: eq(variables['Build.SourceBranch'], 'refs/heads/develop')
+
+      dependsOn: ApprovalGate
+
+      jobs:
+        - deployment: DeployFrontendToDev
+          displayName: Deploy To Dev
+
+          environment:
+            name: frontendDev
+            resourceName: 'frontendv4YKREE'
+            resourceType: virtualMachine
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                - task: DownloadBuildArtifacts@1
+                  inputs:
+                    buildType: 'specific'
+                    project: '8b8cab46-ede3-44b6-a546-5442c39ab271'
+                    pipeline: '40'
+                    specificBuildWithTriggering: true
+                    buildVersionToDownload: 'specific'
+                    buildId: '630'
+                    downloadType: 'single'
+                    artifactName: 'todo-ui'
+                    downloadPath: '$(Build.SourcesDirectory)/build_ui_artefacts'
+                - task: Bash@3
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      sudo cp -r $(System.DefaultWorkingDirectory)/build_ui_artefacts/* /var/www/html/
+                            sudo chown -R www-data:www-data /var/www/html
+
+        # - deployment: DeployBackendToDev
+        #   displayName: Deploy Backend To Dev
+          
+        #   # dependsOn: DeployFrontendToDev
+
+        #   environment:
+        #     name: backendDev
+        #     resourceName: backendvmXH5F57
+        #     resourceType: virtualMachine
+        #   strategy:
+        #     runOnce:
+        #       deploy:
+        #         steps:
+                # - task: DownloadBuildArtifacts@1
+                #   inputs:
+                #     buildType: 'specific'
+                #     project: '8b8cab46-ede3-44b6-a546-5442c39ab271'
+                #     pipeline: '40'
+                #     specificBuildWithTriggering: true
+                #     buildVersionToDownload: 'specific'
+                #     buildId: '645'
+                #     downloadType: 'single'
+                #     artifactName: 'todo-backend'
+                #     downloadPath: '$(Build.SourcesDirectory)/build_backend_artefacts'
+                # - task: Bash@3
+                #   inputs:
+                #     targetType: 'inline'
+                #     script: |
+                #       sudo mkdir /home/authusersai123/backendArtifacts
+                #       sudo cp -r $(System.DefaultWorkingDirectory)/build_ui_artefacts/* /var/www/html/
+                #             sudo chown -R www-data:www-data /home/authusersai123/backendArtifacts
+
+                # - task: Bash@3
+                #   inputs:
+                #     targetType: 'inline'
+                #     script: |
+                #       sudo su
+                #       apt-get update && apt-get install -y unixodbc unixodbc-dev
+                #       curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+                      # curl https://packages.microsoft.com/config/debian/10/prod.list > /etc/apt/sources.list.d/mssql-release.list
+                      # apt-get update
+                      # ACCEPT_EULA=Y apt-get install -y msodbcsql17
+                      # pip install -r requirements.txt
+                      # uvicorn app:app --host 0.0.0.0 --port 8000
+
+        - deployment: DeployBackendToDev
+          displayName: Deploy Backend To Dev
+          dependsOn: DeployFrontendToDev
+          environment:
+            name: backendDev
+            resourceType: virtualMachine
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                - task: DownloadBuildArtifacts@1
+                  inputs:
+                    buildType: 'specific'
+                    project: '8b8cab46-ede3-44b6-a546-5442c39ab271'
+                    pipeline: '40'
+                    specificBuildWithTriggering: true
+                    buildVersionToDownload: 'specific'
+                    buildId: '645'
+                    downloadType: 'single'
+                    artifactName: 'todo-backend'
+                    downloadPath: '$(Build.SourcesDirectory)/build_backend_artefacts'
+                
+                - task: Bash@3
+                  displayName: 'Copy Backend Artifacts'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      # Create directory if it doesn't exist
+                      sudo mkdir -p /home/authusersai123/backendArtifacts
+                      
+                      # Copy artifacts
+                      sudo cp -r $(System.DefaultWorkingDirectory)/build_backend_artefacts/* /home/authusersai123/backendArtifacts/
+                      
+                      # Set permissions
+                      sudo chown -R authusersai123:authusersai123 /home/authusersai123/backendArtifacts
+                      sudo chmod -R 755 /home/authusersai123/backendArtifacts
+                
+                - task: Bash@3
+                  displayName: 'Install Dependencies and Start Backend'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      # Change to backend directory
+                      cd /home/authusersai123/backendArtifacts
+                      
+                      # Install system dependencies (no sudo su needed)
+                      sudo apt-get update && sudo apt-get install -y unixodbc unixodbc-dev python3-pip python3-venv
+                      
+                      # Install MS SQL Server ODBC driver
+                      curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+                      curl https://packages.microsoft.com/config/debian/10/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+                      sudo apt-get update
+                      sudo ACCEPT_EULA=Y apt-get install -y msodbcsql17
+                      
+                      # Create virtual environment
+                      python3 -m venv venv
+                      source venv/bin/activate
+                      
+                      # Upgrade pip and install requirements
+                      pip install --upgrade pip
+                      pip install -r requirements.txt
+                      
+                      # Start the application in background (detached mode)
+                      nohup uvicorn app:app --host 0.0.0.0 --port 8000 > backend.log 2>&1 &
+                      
+                      # Check if app is running
+                      sleep 5
+                      echo "Application status:"
+                      curl -s http://localhost:8000/health || echo "Health check failed"
+                      echo "Backend deployment completed!"

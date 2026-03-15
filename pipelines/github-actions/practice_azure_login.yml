@@ -1,0 +1,27 @@
+name: Practice Azure Login
+
+on:
+  workflow-dispatch:
+    inputs:
+      take-input:
+        description: Take Users Input
+        default: yes
+        options:
+          - yes
+          - no
+
+jobs:
+  Azure-login:
+    steps:
+      uses: actions/checkout@v4
+      - name Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_SP_CRDENTIALS }}
+
+      - name: Run Script
+        run: |
+          sudo apt update \
+          sudo apt upgrde -y
+
+      
